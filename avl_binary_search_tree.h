@@ -1,0 +1,6 @@
+#ifndef __AVL_BINARY_SEARCH_TREE_
+#define __AVL_BINARY_SEARCH_TREE_
+
+
+#endif __AVL_BINARY_SEARCH_TREE_
+
