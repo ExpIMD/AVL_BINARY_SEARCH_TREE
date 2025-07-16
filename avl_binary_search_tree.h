@@ -328,23 +328,23 @@ namespace IMD{
             return dummy;
         }
         node* create_node(const Key& key, node* parent, node* left, node* right, size_t height = 1){
-            node* result = _alc.allocate(1);
+            node* node = _alc.allocate(1);
 
-			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_parent));
-			result->_parent = parent;
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(node->_parent));
+			node->_parent = parent;
 
-			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_left));
-			result->_left = left;
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(node->_left));
+			node->_left = left;
 
-			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_right));
-			result->_right = right;
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(node->_right));
+			node->_right = right;
 
-			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_key), key);
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(node->_key), key);
 
-			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_height));
-			result->_height = 1;
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(node->_height));
+			node->_height = 1;
 
-			return result;
+			return node;
         }
         void destroy_node(node* node){
             std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_key));
@@ -442,7 +442,7 @@ namespace IMD{
                 print_width_helper(node->_left, line + " ");
             }
 		}
-        
+
     private:
         class node{
             public:
