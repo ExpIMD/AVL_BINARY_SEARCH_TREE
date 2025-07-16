@@ -2,15 +2,15 @@
 #include <iostream>
 
 int main(){
+
     IMD::avl_binary_search_tree<int> a{};
     a.insert(9);
+    a.insert(3);
+    a.insert(11);
+    a.insert(-2);
+    a.insert(0);
     a.insert(1);
-    a.insert(12);
-    a.insert(2);
-    a.insert(4);
-    a.insert(13);
-    a.insert(5);
-
+    
     a.print_width();
 
     std::cout << a.size() << std::endl;
