@@ -51,9 +51,18 @@ namespace IMD{
             for(const auto& x : other)
                 this->insert(x);
         }
-        avl_binary_search_tree(const std::initializer_list<Key>& ilist) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
+        avl_binary_search_tree(const std::initializer_list<Key>& ilist, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
             for(const auto& x : ilist)
                 this->insert(x);
+        }
+        template <class InputIterator>
+        avl_binary_search_tree(InputIterator begin, InputIterator end, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
+            this->insert(begin, end);
+        }
+
+        ~avl_binary_search_tree() noexcept{
+            this->clear();
+            this->destroy_node(this->_dummy);
         }
 
         constexpr size_type rebalance_count() const noexcept{
@@ -77,8 +86,232 @@ namespace IMD{
         }
 
         void clear() noexcept{
+            if (this->empty()) return;
+
+            std::queue<node*> q;
+            q.push(this->_dummy->_parent);
+
+            while (!q.empty()) {
+                node* current = q.front();
+                q.pop();
+
+                if (current->_left != this->_dummy) {
+                    q.push(current->_left);
+                }
+                if (current->_right != this->_dummy) {
+                    q.push(current->_right);
+                }
+
+                destroy_node(current);
+            }
+
+            this->_dummy->_parent = this->_dummy;
+            this->_dummy->_left = this->_dummy;
+            this->_dummy->_right = this->_dummy;
+            this->_size = 0;
+            this->_rebalance_count = 0;
 
         }
+
+        iterator begin() const noexcept{
+            return iterator(this->_dummy->_left, this->_dummy);
+        }
+        iterator end() const noexcept{
+            return iterator(this->_dummy, this->_dummy);
+        }
+
+        reverse_iterator rbegin() const noexcept{
+            return reverse_iterator(iterator(this->end()));
+        }
+        reverse_iterator rend() const noexcept{
+            return reverse_iterator(iterator(this->begin()));
+        }
+
+		const_iterator cbegin() const noexcept {
+			return const_iterator(iterator(this->begin()));
+		}
+		const_iterator cend() const noexcept {
+			return const_iterator(iterator(this->end()));
+		}
+
+		const_reverse_iterator crbegin() const	noexcept {
+			return const_reverse_iterator(iterator(this->end()));
+		}
+		const_reverse_iterator crend() const noexcept {
+			return const_reverse_iterator(iterator(this->begin()));
+		}
+
+        iterator insert(const Key& key){            
+            node* current = this->_dummy->_parent;
+            node* previous = this->_dummy;
+
+            while(current != this->_dummy){
+                previous = current;
+
+                if (this->_cmp(current->_key, key))
+                    current = current->_right;
+                else
+                    current = current->_left;
+            }
+
+            node* new_node = this->create_node(key, previous, this->_dummy, this->_dummy);
+
+            if (previous == this->_dummy){
+                previous->_parent = new_node;
+                previous->_left = new_node;
+                previous->_right = new_node;
+            }
+            else{
+                if (this->_cmp(previous->_key, key)){
+                    previous->_right = new_node;
+                    if (this->_dummy->_right == previous)
+                        this->_dummy->_right = new_node;
+                }
+                else{
+                    previous->_left = new_node;
+                    if (this->_dummy->_left == previous)
+                        this->_dummy->_left = new_node;
+                }
+            }
+            
+            ++this->_size;
+            this->rebalance(new_node->_parent);
+
+            return iterator(new_node, this->_dummy);
+        }
+
+        template<typename InputIterator>
+        void insert(InputIterator begin, InputIterator end){
+            while(begin != end){
+                this->insert(*begin);
+                ++begin;
+            }
+        }
+
+        void print_width() const noexcept {
+			print_width_helper(this->_dummy->_parent, "");
+		}
+
+        void breadth_first_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+        
+            std::queue<node*> queue{};
+            queue.push(this->_dummy->_parent);
+        
+            while (!queue.empty()) {
+                auto node = queue.front();
+                queue.pop();
+        
+                action(node->_key);
+        
+                if (node->_left != this->_dummy)
+                    queue.push(node->_left);
+        
+                if (node->_right != this->_dummy)
+                    queue.push(node->_right);
+            }
+        }        
+
+        void prefix_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+
+            std::stack<node*> stack{};
+            stack.push(this->_dummy->_parent);
+
+            while(!stack.empty()){
+                auto node = stack.top();
+                stack.pop();
+
+                action(node->_key);
+
+                if (node->_right != this->_dummy)
+                    stack.push(node->_right);
+                if (node->_left != this->_dummy)
+                    stack.push(node->_left);
+            }
+        }
+
+        void infix_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+        
+            std::stack<node*> stack;
+            node* current = this->_dummy->_parent; 
+        
+            while (!stack.empty() || current != this->_dummy) {
+                while (current != this->_dummy) {
+                    stack.push(current);
+                    current = current->_left;
+                }
+        
+                current = stack.top();
+                stack.pop();
+                action(current->_key);
+        
+                current = current->_right;
+            }
+        }
+
+        void postfix_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+        
+            std::stack<node*> stack;
+            node* current = this->_dummy->_parent;
+            node* last_visited = this->_dummy;
+        
+            while (!stack.empty() || current != this->_dummy) {
+                while (current != this->_dummy) {
+                    stack.push(current);
+                    current = current->_left;
+                }
+        
+                node* peek = stack.top();
+        
+                if (peek->_right != this->_dummy && peek->_right != last_visited)
+                    current = peek->_right;
+                else {
+                    action(peek->_key);
+                    last_visited = peek;
+                    stack.pop();
+                }
+            }
+        }
+
+        void zigzag_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+            
+            std::stack<node*> current_level, next_level;
+            bool left_to_right {false};
+            
+            current_level.push(this->_dummy->_parent);
+            
+            while (!current_level.empty()) {
+                auto node = current_level.top();
+                current_level.pop();
+                
+                action(node->_key);
+                
+                if (left_to_right) {
+                    if (node->_left != this->_dummy)
+                        next_level.push(node->_left);
+                    if (node->_right != this->_dummy)
+                        next_level.push(node->_right);
+                } else {
+                    if (node->_right != this->_dummy)
+                        next_level.push(node->_right);
+                    if (node->_left != this->_dummy)
+                        next_level.push(node->_left);
+                }
+                
+                if (current_level.empty()) {
+                    std::swap(current_level, next_level);
+                    left_to_right = !left_to_right;
+                }
+            }
+        }
+        
+        
+
+    private:
 
         node* create_dummy(){
             node* dummy = this->_alc.allocate(1);
@@ -171,98 +404,10 @@ namespace IMD{
             }
         }
 
-        iterator begin() const noexcept{
-            return iterator(this->_dummy->_left, this->_dummy);
+        void destroy_node(node* node){
+            this->_alc.destroy(node);
+            this->_alc.deallocate(node, 1);
         }
-        iterator end() const noexcept{
-            return iterator(this->_dummy, this->_dummy);
-        }
-
-        reverse_iterator rbegin() const noexcept{
-            return reverse_iterator(iterator(this->end()));
-        }
-        reverse_iterator rend() const noexcept{
-            return reverse_iterator(iterator(this->begin()));
-        }
-
-		const_iterator cbegin() const noexcept {
-			return const_iterator(iterator(this->begin()));
-		}
-		const_iterator cend() const noexcept {
-			return const_iterator(iterator(this->end()));
-		}
-
-		const_reverse_iterator crbegin() const	noexcept {
-			return const_reverse_iterator(iterator(this->end()));
-		}
-		const_reverse_iterator crend() const noexcept {
-			return const_reverse_iterator(iterator(this->begin()));
-		}
-
-        iterator insert(const Key& key){            
-            node* current = this->_dummy->_parent;
-            node* previous = this->_dummy;
-
-            while(current != this->_dummy){
-                previous = current;
-
-                if (this->_cmp(current->_key, key))
-                    current = current->_right;
-                else
-                    current = current->_left;
-            }
-
-            node* new_node = this->create_node(key, previous, this->_dummy, this->_dummy);
-
-            if (previous == this->_dummy){
-                previous->_parent = new_node;
-                previous->_left = new_node;
-                previous->_right = new_node;
-            }
-            else{
-                if (this->_cmp(previous->_key, key)){
-                    previous->_right = new_node;
-                    if (this->_dummy->_right == previous)
-                        this->_dummy->_right = new_node;
-                }
-                else{
-                    previous->_left = new_node;
-                    if (this->_dummy->_left == previous)
-                        this->_dummy->_left = new_node;
-                }
-            }
-            
-            ++this->_size;
-            this->rebalance(new_node->_parent);
-
-            return iterator(new_node, this->_dummy);
-        }
-
-        void print_width() const noexcept {
-			print_width_helper(this->_dummy->_parent, "");
-		}
-
-        void prefix_traversal(std::function<void(const Key&)> action) const {
-            if (this->empty()) return;
-
-            std::stack<node*> stack{};
-            stack.push(this->_dummy->_parent);
-
-            while(!stack.empty()){
-                auto node = stack.top();
-                stack.pop();
-
-                action(node->_key);
-
-                if (node->_right != this->_dummy)
-                    stack.push(node->_right);
-                if (node->_left != this->_dummy)
-                    stack.push(node->_left);
-            }
-        }
-
-
-    private:
 
         void print_width_helper(node* node, const std::string& line) const noexcept {
             if (node != this->_dummy) {

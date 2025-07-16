@@ -1,15 +1,18 @@
 #include "avl_binary_search_tree.h"
 #include <iostream>
+#include <vector>
 
 int main(){
 
+    std::vector<int> vec{3, 2, 1, 0, -1, -2, -3};
 
+    IMD::avl_binary_search_tree<int> a{vec.begin(), vec.end()};
 
+    a.zigzag_traversal([](int x){std::cout << x << " ";});
 
-    IMD::avl_binary_search_tree<int> a{std::initializer_list<int>{1, 2, 3, 4, 5, 6, 7, 8, 9}};
+    std::cout << std::endl;
 
     a.print_width();
-
 
     std::cout << std::endl << a.size() << std::endl;
 
