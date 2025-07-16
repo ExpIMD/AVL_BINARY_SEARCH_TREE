@@ -3,17 +3,15 @@
 
 int main(){
 
-    IMD::avl_binary_search_tree<int> a{};
-    a.insert(9);
-    a.insert(3);
-    a.insert(11);
-    a.insert(-2);
-    a.insert(0);
-    a.insert(1);
-    
+
+
+
+    IMD::avl_binary_search_tree<int> a{std::initializer_list<int>{1, 2, 3, 4, 5, 6, 7, 8, 9}};
+
     a.print_width();
 
-    std::cout << a.size() << std::endl;
+
+    std::cout << std::endl << a.size() << std::endl;
 
     std::cout << a.rebalance_count() << std::endl;
 

@@ -20,7 +20,6 @@ namespace IMD{
 
     private:
         using NodeAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<node>;
-
     
     public:
         using key_type = Key;
@@ -48,7 +47,14 @@ namespace IMD{
 
     public:
         avl_binary_search_tree(const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(cmp), _alc(alc), _size(0), _rebalance_count(0) {}
-
+        avl_binary_search_tree(const avl_binary_search_tree& other) : _dummy(create_dummy()), _cmp(other._cmp), _alc(other._alc), _size(0), _rebalance_count(0) {
+            for(const auto& x : other)
+                this->insert(x);
+        }
+        avl_binary_search_tree(const std::initializer_list<Key>& ilist) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
+            for(const auto& x : ilist)
+                this->insert(x);
+        }
 
         constexpr size_type rebalance_count() const noexcept{
             return this->_rebalance_count;
@@ -60,6 +66,18 @@ namespace IMD{
 
         constexpr bool empty() const noexcept{
             return this->size() == 0;
+        }
+
+        void swap(avl_binary_search_tree& other) noexcept{
+            std::swap(this->_dummy, other._dummy);
+            std::swap(this->_size, other._size);
+            std::swap(this->_rebalance_count, other._rebalance_count);
+            std::swap(this->_alc, other._alc);
+            std::swap(this->_cmp, other._cmp);
+        }
+
+        void clear() noexcept{
+
         }
 
         node* create_dummy(){
@@ -105,7 +123,7 @@ namespace IMD{
             b->_parent = a->_parent;
 
             if (a->_parent == this->_dummy) this->_dummy->_parent = b;
-            if (a->_parent->_left == a) a->_parent->_left = b;
+            else if (a->_parent->_left == a) a->_parent->_left = b;
             else a->_parent->_right = b;
 
             a->_parent = b;
@@ -161,24 +179,24 @@ namespace IMD{
         }
 
         reverse_iterator rbegin() const noexcept{
-            return reverse_iterator(iterator(end));
+            return reverse_iterator(iterator(this->end()));
         }
         reverse_iterator rend() const noexcept{
-            return reverse_iterator(iterator(begin()));
+            return reverse_iterator(iterator(this->begin()));
         }
 
 		const_iterator cbegin() const noexcept {
-			return const_iterator(iterator(begin()));
+			return const_iterator(iterator(this->begin()));
 		}
 		const_iterator cend() const noexcept {
-			return const_iterator(iterator(end()));
+			return const_iterator(iterator(this->end()));
 		}
 
 		const_reverse_iterator crbegin() const	noexcept {
-			return const_reverse_iterator(iterator(end()));
+			return const_reverse_iterator(iterator(this->end()));
 		}
 		const_reverse_iterator crend() const noexcept {
-			return const_reverse_iterator(iterator(begin()));
+			return const_reverse_iterator(iterator(this->begin()));
 		}
 
         iterator insert(const Key& key){            
@@ -197,31 +215,51 @@ namespace IMD{
             node* new_node = this->create_node(key, previous, this->_dummy, this->_dummy);
 
             if (previous == this->_dummy){
+                previous->_parent = new_node;
                 previous->_left = new_node;
                 previous->_right = new_node;
-                previous->_parent = new_node;
             }
             else{
                 if (this->_cmp(previous->_key, key)){
                     previous->_right = new_node;
-                    if (this->_dummy->_right != previous)
+                    if (this->_dummy->_right == previous)
                         this->_dummy->_right = new_node;
                 }
                 else{
                     previous->_left = new_node;
-                    if (this->_dummy->_left != previous)
+                    if (this->_dummy->_left == previous)
                         this->_dummy->_left = new_node;
                 }
             }
             
             ++this->_size;
             this->rebalance(new_node->_parent);
+
             return iterator(new_node, this->_dummy);
         }
 
         void print_width() const noexcept {
 			print_width_helper(this->_dummy->_parent, "");
 		}
+
+        void prefix_traversal(std::function<void(const Key&)> action) const {
+            if (this->empty()) return;
+
+            std::stack<node*> stack{};
+            stack.push(this->_dummy->_parent);
+
+            while(!stack.empty()){
+                auto node = stack.top();
+                stack.pop();
+
+                action(node->_key);
+
+                if (node->_right != this->_dummy)
+                    stack.push(node->_right);
+                if (node->_left != this->_dummy)
+                    stack.push(node->_left);
+            }
+        }
 
 
     private:
@@ -296,26 +334,49 @@ namespace IMD{
                     }
         
                     iterator& operator++() noexcept{
-                        if (this->_node == this->_dummy)
-                            this->_node = this->_dummy->_left;
-                        else{
-                            node* temp = this->_node;
-                            if (temp->_right != this->_dummy){
-                                temp = temp->_right;
-                                while(temp->_left != this->_dummy)
-                                    temp = temp->_left;
-                                this->_node = temp;
-                            }
-                            else{
-                                if (temp == this->_dummy->_right) this->_node = this->_dummy;
-                                else{
-                                    while(temp->_parent->_left != temp)
-                                        temp = temp->_parent;
-                                    this->_node = temp->_parent;
-                                }
-                            }
+                        if (_node == _dummy) {
+                            return *this;
+                        }
+                    
+                        if (this->_node->_right != this->_dummy) {
+                            this->_node = this->_node->_right;
+                            while (this->_node->_left != this->_dummy)
+                                this->_node = this->_node->_left;
+                        } else {
+                            while (this->_node->_parent != this->_dummy && this->_node == this->_node->_parent->_right)
+                                this->_node = this->_node->_parent;
+                            this->_node = this->_node->_parent;
                         }
                         return *this;
+                    }
+                    iterator& operator--() noexcept {
+                        if (this->_node == this->_dummy) {
+                            this->_node = this->_dummy->_right;
+                            return *this;
+                        }
+                
+                        if (this->_node->_left != this->_dummy) {
+                            this->_node = this->_node->_left;
+                            while (this->_node->_right != this->_dummy)
+                                this->_node = this->_node->_right;
+                        } else {
+                            while (this->_node->_parent != this->_dummy && this->_node == this->_node->_parent->_left)
+                                this->_node = this->_node->_parent;
+                            this->_node = this->_node->_parent;
+                        }
+                        return *this;
+                    }
+                
+                    iterator operator--(int) noexcept {
+                        iterator it {*this};
+                        this->operator--();
+                        return it;
+                    }
+
+                    iterator operator++(int) noexcept{
+                        iterator it{ *this };
+                        this->operator++();
+                        return it;
                     }
 
                     bool operator!=(const iterator& other) const {
