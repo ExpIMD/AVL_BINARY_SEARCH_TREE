@@ -51,12 +51,12 @@ namespace IMD{
             for(const auto& x : other)
                 this->insert(x);
         }
-        avl_binary_search_tree(const std::initializer_list<Key>& ilist, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
+        avl_binary_search_tree(const std::initializer_list<Key>& ilist, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(cmp), _alc(alc), _size(0), _rebalance_count(0) {
             for(const auto& x : ilist)
                 this->insert(x);
         }
         template <class InputIterator>
-        avl_binary_search_tree(InputIterator begin, InputIterator end, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(), _alc(), _size(0), _rebalance_count(0) {
+        avl_binary_search_tree(InputIterator begin, InputIterator end, const Comparator& cmp = Comparator(), const Allocator& alc = Allocator()) : _dummy(create_dummy()), _cmp(cmp), _alc(alc), _size(0), _rebalance_count(0) {
             this->insert(begin, end);
         }
 
@@ -280,7 +280,7 @@ namespace IMD{
             if (this->empty()) return;
             
             std::stack<node*> current_level, next_level;
-            bool left_to_right {false};
+            bool left_to_right {true};
             
             current_level.push(this->_dummy->_parent);
             
@@ -308,22 +308,55 @@ namespace IMD{
                 }
             }
         }
-        
-        
 
     private:
-
         node* create_dummy(){
             node* dummy = this->_alc.allocate(1);
-            this->_alc.construct(dummy, Key(), dummy, dummy, dummy, 0);
+
+            std::allocator_traits<NodeAllocator>::construct(_alc, &(dummy->_parent));
+			dummy->_parent = dummy;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(dummy->_left));
+			dummy->_left = dummy;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(dummy->_right));
+			dummy->_right = dummy;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(dummy->_height));
+			dummy->_height = 0;
+
             return dummy;
         }
-
         node* create_node(const Key& key, node* parent, node* left, node* right, size_t height = 1){
-            node* n = this->_alc.allocate(1);
-            this->_alc.construct(n, key, parent, left, right, height);
-            return n;
+            node* result = _alc.allocate(1);
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_parent));
+			result->_parent = parent;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_left));
+			result->_left = left;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_right));
+			result->_right = right;
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_key), key);
+
+			std::allocator_traits<NodeAllocator>::construct(_alc, &(result->_height));
+			result->_height = 1;
+
+			return result;
         }
+        void destroy_node(node* node){
+            std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_key));
+            this->destroy_dummy(node);
+        }
+        void destroy_dummy(node* node) {
+			std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_parent));
+			std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_left));
+			std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_right));
+			std::allocator_traits<NodeAllocator>::destroy(_alc, &(node->_height));
+			std::allocator_traits<NodeAllocator>::deallocate(_alc, node, 1);
+		}
         
         void slight_left_rotate(node* a){
             node* b = a->_right;
@@ -345,7 +378,6 @@ namespace IMD{
 
             ++this->_rebalance_count;
         }
-
         void slight_right_rotate(node* a){
             node* b = a->_left;
 
@@ -371,7 +403,6 @@ namespace IMD{
             this->slight_right_rotate(a->_right);
             this->slight_left_rotate(a);
         }
-
         void big_right_rotate(node* a){
             this->slight_left_rotate(a->_left);
             this->slight_right_rotate(a);
@@ -379,11 +410,11 @@ namespace IMD{
 
         void rebalance(node* node){
             while(node != this->_dummy){
-                auto balance = node->get_balance();
+                auto balance = node->balance();
                 if (balance < -1 || balance > 1){
 
                     if (balance == -2){
-                        auto temp = node->_right->get_balance();
+                        auto temp = node->_right->balance();
                         if (temp == 1)
                             this->big_left_rotate(node);
                         else
@@ -391,7 +422,7 @@ namespace IMD{
                     }
 
                     if (balance == 2){
-                        auto temp = node->_left->get_balance();
+                        auto temp = node->_left->balance();
                         if (temp == -1)
                             this->big_right_rotate(node);
                         else
@@ -404,11 +435,6 @@ namespace IMD{
             }
         }
 
-        void destroy_node(node* node){
-            this->_alc.destroy(node);
-            this->_alc.deallocate(node, 1);
-        }
-
         void print_width_helper(node* node, const std::string& line) const noexcept {
             if (node != this->_dummy) {
                 print_width_helper(node->_right, line + " ");
@@ -416,7 +442,8 @@ namespace IMD{
                 print_width_helper(node->_left, line + " ");
             }
 		}
-
+        
+    private:
         class node{
             public:
                 Key _key;
@@ -433,13 +460,13 @@ namespace IMD{
                     return this->_height == 0 && other._height == 0 ? true : this->_key == other._key;
                 }
         
-                size_t get_height() const noexcept {
+                size_t height() const noexcept {
                     return this->_height;
                 }
         
-                int get_balance() const noexcept{
-                    auto left_height = this->_left->get_height();
-                    auto right_height = this->_right->get_height();
+                int balance() const noexcept{
+                    auto left_height = this->_left->height();
+                    auto right_height = this->_right->height();
                     
                     return left_height - right_height;
                 }
@@ -448,8 +475,8 @@ namespace IMD{
                     size_t left_height{0};
                     size_t right_height{0};
                     
-                    left_height = this->_left->get_height();
-                    right_height = this->_right->get_height();
+                    left_height = this->_left->height();
+                    right_height = this->_right->height();
                     
                     this->_height = 1 + std::max(left_height, right_height);
                 }
@@ -511,16 +538,15 @@ namespace IMD{
                         }
                         return *this;
                     }
-                
-                    iterator operator--(int) noexcept {
-                        iterator it {*this};
-                        this->operator--();
-                        return it;
-                    }
 
                     iterator operator++(int) noexcept{
                         iterator it{ *this };
                         this->operator++();
+                        return it;
+                    }
+                    iterator operator--(int) noexcept {
+                        iterator it {*this};
+                        this->operator--();
                         return it;
                     }
 
@@ -534,4 +560,3 @@ namespace IMD{
     };   
 }
 #endif
-
