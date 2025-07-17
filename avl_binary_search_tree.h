@@ -77,6 +77,30 @@ namespace IMD{
             return this->size() == 0;
         }
 
+        size_t leaf_count() const noexcept{
+            if (this->empty()) return 0;
+
+            size_t count{0};
+        
+            std::queue<node*> queue{};
+            queue.push(this->_dummy->_parent);
+        
+            while (!queue.empty()) {
+                auto node = queue.front();
+                queue.pop();
+
+                if (node->_left == this->_dummy && node->_right == this->_dummy)
+                    ++count;
+        
+                if (node->_left != this->_dummy)
+                    queue.push(node->_left);
+        
+                if (node->_right != this->_dummy)
+                    queue.push(node->_right);
+            }
+            return count;
+        }
+
         void swap(avl_binary_search_tree& other) noexcept{
             std::swap(this->_dummy, other._dummy);
             std::swap(this->_size, other._size);
